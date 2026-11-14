@@ -1,0 +1,20 @@
+[Defines]
+  INF_VERSION                    = 0x0001001B
+  BASE_NAME                      = WifiQca
+  FILE_GUID                      = F6A7B8C9-D0E1-2345-FABC-456789012345
+  MODULE_TYPE                    = UEFI_DRIVER
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = WifiQcaDriverEntry
+
+[Sources]
+  WifiQca.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  JASON/UefiPlatform.dec
+
+[LibraryClasses]
+  BaseLib
+  IoLib
+  UefiDriverEntryPoint
+  UefiBootServicesTableLib

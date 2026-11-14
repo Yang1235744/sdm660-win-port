@@ -1,0 +1,20 @@
+[Defines]
+  INF_VERSION                    = 0x0001001B
+  BASE_NAME                      = StorageUfs
+  FILE_GUID                      = B2C3D4E5-F6A7-8901-BCDE-F12345678901
+  MODULE_TYPE                    = UEFI_DRIVER
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = StorageUfsDriverEntry
+
+[Sources]
+  StorageUfs.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  JASON/UefiPlatform.dec
+
+[LibraryClasses]
+  BaseLib
+  IoLib
+  UefiDriverEntryPoint
+  UefiBootServicesTableLib

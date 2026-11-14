@@ -1,0 +1,41 @@
+/*
+ * UefiPlatform.dec — EDK II Device Declaration for the JASON (Xiaomi Note3) platform
+ *
+ * Declares:
+ *   - gJasonPlatformTokenSpaceGuid : PCD GUID used in UefiPlatform.dsc
+ *   - Any private protocols or data structures shared across drivers
+ */
+[Defines]
+  DEC_SPECIFICATION              = 0x0001001B
+  PACKAGE_NAME                   = JASON
+  PACKAGE_GUID                   = EC87D9B2-A1F3-4d78-B2CF-12DE9FAE67CB
+  PACKAGE_VERSION                = 1.0.0
+
+[PcdsFeatureFlag]
+  # Enable touch driver by default (jason always has it present)
+  gJasonPlatformTokenSpaceGuid.PcdTouchEnabled               | TRUE     | BOOLEAN | 0x10000020
+
+  # Default boot mode: 0 = normal, 1 = recovery, 2 = fastboot passthrough
+  gJasonPlatformTokenSpaceGuid.PcdDefaultBootMode            | 0x0    | UINT8  | 0x10000021
+
+[PcdsFixedAtBuild]
+  # Board hardware revision (minor / major packed into one 32-bit value)
+  # Layout: [15:0]=minor, [31:16]=major → 0x00020001 = rev 2.1
+  gJasonPlatformTokenSpaceGuid.PcdBoardRevId                 | 0x00020001 | UINT32 | 0x10000001
+
+  # Number of logical CPUs visible to bootloader (= physical cores on SDM660)
+  gJasonPlatformTokenSpaceGuid.PcdNumCores                   | 8        | UINT8  | 0x10000002
+
+  # Primary display width/height (pixels) — needed for early framebuffer setup
+  gJasonPlatformTokenSpaceGuid.PcdPanelWidth                 | 1080     | UINT16 | 0x10000003
+  gJasonPlatformTokenSpaceGuid.PcdPanelHeight                | 2160     | UINT16 | 0x10000004
+
+  # Whether UFS or eMMC is detected at boot time (false = fallback to MMC probe)
+  gJasonPlatformTokenSpaceGuid.PcdUfsPresent                 | TRUE     | BOOLEAN | 0x10000005
+
+[PcdsDynamicDefault]
+  # WLAN chipset enum — must match the firmware blob loaded onto the card
+  gJasonPlatformTokenSpaceGuid.PcdWifiChipset                | 0x0      | UINT8  | 0x10000007
+
+  # UART baud rate selected at runtime (typically 115200)
+  gJasonPlatformTokenSpaceGuid.PcdUartBaudRate               | 115200   | UINT32 | 0x10000008

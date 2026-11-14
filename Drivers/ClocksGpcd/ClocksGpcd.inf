@@ -1,0 +1,25 @@
+[Defines]
+  INF_VERSION                    = 0x0001001B
+  BASE_NAME                      = ClocksGpcd
+  FILE_GUID                      = A1B2C3D4-E5F6-7890-ABCD-EF1234567890
+  MODULE_TYPE                    = UEFI_DRIVER
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = GpcdDriverEntry
+
+[Sources]
+  ClocksGpcd.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  ArmPkg/ArmPkg.dec
+  JASON/UefiPlatform.dec
+
+[LibraryClasses]
+  BaseLib
+  IoLib
+  UefiDriverEntryPoint
+  UefiBootServicesTableLib
+
+[Protocols]
+  gEdkiiTokenSpaceGuid                           ## CONSUMED
+  gJasonPlatformTokenSpaceGuid                   ## CONSUMED

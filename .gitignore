@@ -1,0 +1,50 @@
+# Build artifacts
+Build/
+*.log
+*.bin
+*.lib
+*.elf
+*.out
+*.obj
+*.o
+*.sym
+*.dep
+*.htm
+*.fdf
+*.map
+*.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.tox/
+.eggs/
+dist/
+*.egg-info/
+
+# EDK2
+edk2-stable*/
+*.dsc.inc
+!*.dsc
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS junk
+.DS_Store
+Thumbs.db
+.screenshots/
+
+# Credential / keys (never commit real certificates)
+*.cer
+*.key
+*.pfx
+credentials.*
+*.pem
+!.gitignore
+!.README.md

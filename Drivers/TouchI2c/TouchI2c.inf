@@ -1,0 +1,20 @@
+[Defines]
+  INF_VERSION                    = 0x0001001B
+  BASE_NAME                      = TouchI2c
+  FILE_GUID                      = D4E5F6A7-B8C9-0123-DEFA-234567890123
+  MODULE_TYPE                    = UEFI_DRIVER
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = TouchI2cDriverEntry
+
+[Sources]
+  TouchI2c.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  JASON/UefiPlatform.dec
+
+[LibraryClasses]
+  BaseLib
+  IoLib
+  UefiDriverEntryPoint
+  UefiBootServicesTableLib
