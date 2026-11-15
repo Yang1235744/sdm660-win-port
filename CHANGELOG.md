@@ -2,6 +2,17 @@
 
 本仓库只记录可复核的改动。任何"已实现"都不等于"已在真机验证"；运行状态一列在 `Docs/hardware-notes.md`。
 
+## v0.4.1 — UFS 绑定标识核实
+
+### 变更
+
+- `AcpiTables/ssdt_periph.asl` 的 `UFS0` 从占位 `JAS0002` 改为核实过的 `_HID "QCOM24A5"` + `_CID "ACPI\\QCOM24A5"`，并补上 SPI 265（ACPI GSI 297）。Windows 硬件 ID 由 `_CID` 生成，缺 `_CID` 时只有 `ACPI\QCOM24A5` 这一条 `_HID` 派生值，绑定行为会有差异。
+
+### 调研结论
+
+- WCN3990/ICNSS 在公开资料中没有可用于 Windows 的 ACPI `_HID`：edk2-msm 的 msm8998 `wcnss_wlan.asl` 中该设备只有 `_ADR`/`_PRW`/`_CRS`，没有 `_HID`；也没有公开的 ARM64 WCN3990-over-ICNSS 驱动（`edk2-porting/WOA-Drivers` 的 SDM845 平台组件里只有 Audio/Bluetooth/Camera/FG/GPIO/Subsys，没有 WLAN）。因此 `WLAN` 节点保留 Jason 占位 ID。
+- 同类 Qualcomm 存储驱动的硬件 ID 形如 `ACPI\QCOM7002`（SDHostQualcomm）、`ACPI\QCOM2465`（SDHostQualcomm8974），可佐证 `_CID` 是实际匹配项。
+
 ## v0.4.0 — Windows 10 ARM64 外设描述（网卡 / USB / UFS）
 
 ### 新增

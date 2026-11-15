@@ -11,13 +11,15 @@
  *
  *   2. Devices that have no public Windows driver yet:
  *        WLAN  _HID = JAS0001  (ICNSS / WCN3990 WLAN)
- *        UFS0  _HID = JAS0002  (UFS host controller)
- *      These identifiers are Jason placeholders, not registered vendor IDs.
- *      They make the hardware visible at a known ACPI path with the right
- *      memory windows, which is what a vendor INF needs in order to bind.
- *      Until such an INF is available the device shows up without a driver.
- *      When a real Windows 10 ARM64 INF appears, replace the _HID string with
- *      the one its INF matches; nothing else in this file has to change.
+ *        UFS0  _HID = QCOM24A5 (verified Qualcomm UFS binding)
+ *      JAS0001 is a Jason placeholder, not a registered vendor ID. It makes
+ *      the WLAN hardware visible at a known ACPI path with the right memory
+ *      window, which is what a vendor INF needs in order to bind; until such
+ *      an INF exists the device shows up without a driver. note that the
+ *      edk2-msm WCN3990 node (Platform/Google/msm8998/AcpiTables/walleye/
+ *      wcnss_wlan.asl) also carries no _HID, so no vendor HID is known.
+ *      QCOM24A5 is different: it is the identifier Qualcomm UFS binds to on
+ *      Windows ARM64, see the device below.
  *
  * Verified resources (DTB nodes under /soc):
  *   ICNSS / WLAN   qcom,icnss@18800000   0x18800000 / 0x00800000, SPI 413..425
@@ -70,13 +72,21 @@ DefinitionBlock ("ssdt_periph.aml", "SSDT", 2, "JASON", "PERI", 0x00000002)
         }
 
         /*
-         * UFS host controller plus its PHY and crypto engine. Firmware side
-         * block I/O comes from Drivers/StorageUfs; this node exists so a
-         * Windows 10 ARM64 UFS driver can bind to a documented address range.
+         * UFS host controller. The Windows hardware id is produced by _CID,
+         * so both strings are required: _HID = QCOM24A5 plus
+         * _CID = ACPI\QCOM24A5. This is the identifier used by the Qualcomm
+         * UFS ACPI binding on SDM845/SDM660 class platforms (edk2-msm
+         * Silicon/Qualcomm/sdm845/AcpiTables/ufs.asl, and the same value in
+         * drivers/ufs/host/ufs-qcom.c).
+         *
+         * Only the memory windows and the SPI are Jason specific: host
+         * 0x01DA4000/0x3000, PHY 0x01DA7000/0xDB8, ICE 0x01DB0000/0x8000,
+         * SPI 265 (ACPI GSI 297 = SPI + 32).
          */
         Device (UFS0)
         {
-            Name (_HID, "JAS0002")
+            Name (_HID, "QCOM24A5")
+            Name (_CID, "ACPI\\QCOM24A5")
             Name (_UID, 0)
             Name (_STA, 0x0F)
             Name (_CRS, ResourceTemplate ()
@@ -84,6 +94,7 @@ DefinitionBlock ("ssdt_periph.aml", "SSDT", 2, "JASON", "PERI", 0x00000002)
                 Memory32Fixed (ReadWrite, 0x01DA4000, 0x00003000)
                 Memory32Fixed (ReadWrite, 0x01DA7000, 0x00000DB8)
                 Memory32Fixed (ReadWrite, 0x01DB0000, 0x00008000)
+                Interrupt (ResourceConsumer, Level, ActiveHigh, Exclusive) { 297 }
             })
         }
     }

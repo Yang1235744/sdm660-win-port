@@ -296,8 +296,8 @@ Ufs: LUN 0 published as block device
 本轮按 Windows 10 ARM64 为目标发布 ACPI 描述，`AcpiTables/ssdt_periph.asl` 里现成的节点：
 
 - `XHC0`：`_HID = "PNP0D10"`，这是 ACPI 定义好的 xHCI 主机控制器 ID，Windows 10 ARM64 自带的 USB 栈会直接绑定，因此 **USB 设备在系统里是即插即用的**，不需要任何厂商驱动。内存窗口只描述 xHCI 寄存器块 `0x0A800000 / 0xC100`，DWC3 核心部分留给后续。
-- `WLAN`：`_HID = "JAS0001"`（占位），资源 `0x18800000 / 0x800000`。
-- `UFS0`：`_HID = "JAS0002"`（占位），UFS 主机、PHY、ICE 三段内存窗口。
+- `WLAN`：`_HID = "JAS0001"`（占位），资源 `0x18800000 / 0x800000`。公开资料里 WCN3990 没有可用的 Windows `_HID`：edk2-msm 的 `Platform/Google/msm8998/AcpiTables/walleye/wcnss_wlan.asl` 里这个设备只有 `_ADR`、`_PRW`、`_CRS`，没有 `_HID`，也没有任何 INF 用 `ACPI\QCOMxxxx` 绑定 ICNSS 形态的 WLAN。所以我保留占位 ID 让设备可见，而不是编一个看起来像厂商 ID 的字符串。
+- `UFS0`：`_HID = "QCOM24A5"` + `_CID = "ACPI\\QCOM24A5"`。这是核实过的 Qualcomm UFS 绑定标识（edk2-msm `Silicon/Qualcomm/sdm845/AcpiTables/ufs.asl`，`drivers/ufs/host/ufs-qcom.c` 的 `acpi_device_id` 同值）。Windows 的硬件 ID 由 `_CID` 产生，所以两者必须同时写。地址窗口与 SPI 用 jason 自己的值。
 
 接入真实驱动的步骤：
 
