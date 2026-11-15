@@ -92,10 +92,10 @@ MadtGenerate (
   Madt->Header.Length          = (UINT32)TotalSize;
   Madt->Header.Revision        = EFI_ACPI_6_4_MULTIPLE_APIC_DESCRIPTION_TABLE_REVISION;
   CopyMem (Madt->Header.OemId, "QCOM  ", 6);
-  CopyMem (Madt->Header.OemTableId, "JASON   ", 8);
+  CopyMem (&Madt->Header.OemTableId, "JASON   ", 8);
   Madt->Header.OemRevision     = 0x00001001;
   Madt->Header.CreatorId       = SIGNATURE_32 ('J', 'A', 'S', 'N');
-  Madt->Header.CreatorVersion  = 0x00000001;
+  Madt->Header.CreatorRevision = 0x00000001;
   Madt->LocalApicAddress       = 0;
   Madt->Flags                  = 0;
 
