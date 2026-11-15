@@ -53,7 +53,7 @@ INF MdeModulePkg/Bus/Usb/UsbBusDxe/UsbBusDxe.inf
 INF MdeModulePkg/Bus/Usb/UsbMassStorageDxe/UsbMassStorageDxe.inf
 INF MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
 INF MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
-INF FatPkg/EnhancedFatDxe/EnhancedFat.inf
+INF FatPkg/EnhancedFatDxe/Fat.inf
 
 [Rule.Common.UEFI_DRIVER]
   FILE DRIVER = $(NAMED_GUID) {

@@ -59,7 +59,7 @@
   # Make the UFS / USB block devices visible as file systems.
   MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
   MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
-  FatPkg/EnhancedFatDxe/EnhancedFat.inf
+  FatPkg/EnhancedFatDxe/Fat.inf
 
 [PcdsFeatureFlag]
   gJasonPlatformTokenSpaceGuid.PcdTouchEnabled|TRUE
