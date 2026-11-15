@@ -11,10 +11,14 @@
 
 [Packages]
   MdePkg/MdePkg.dec
-  JASON/UefiPlatform.dec
+  UefiPlatform/UefiPlatform.dec
+
+[Includes]
+  UefiPlatform/Include
 
 [LibraryClasses]
   BaseLib
   IoLib
-  UefiDriverEntryPoint
   UefiBootServicesTableLib
+  UefiDriverEntryPoint
+  UefiLib

@@ -1,20 +1,33 @@
 [Defines]
   INF_VERSION                    = 0x0001001B
   BASE_NAME                      = UsbHost
-  FILE_GUID                      = C3D4E5F6-A7B8-9012-CDEF-123456789012
-  MODULE_TYPE                    = UEFI_DRIVER
+  FILE_GUID                      = 7C2E41B5-83D6-4E19-A5F7-41B0C9D27E64
+  MODULE_TYPE                    = DXE_DRIVER
   VERSION_STRING                 = 1.0
-  ENTRY_POINT                    = UsbHcDriverEntry
+  ENTRY_POINT                    = UsbHostDriverEntry
 
 [Sources]
   UsbHost.c
 
 [Packages]
   MdePkg/MdePkg.dec
-  JASON/UefiPlatform.dec
+  MdeModulePkg/MdeModulePkg.dec
+  UefiPlatform/UefiPlatform.dec
+
+[Includes]
+  UefiPlatform/Include
 
 [LibraryClasses]
-  BaseLib
-  IoLib
-  UefiDriverEntryPoint
+  DebugLib
+  MemoryAllocationLib
   UefiBootServicesTableLib
+  UefiDriverEntryPoint
+
+[Protocols]
+  gEdkiiNonDiscoverableDeviceProtocolGuid
+
+[Guids]
+  gEdkiiNonDiscoverableXhciDeviceGuid
+
+[Depex]
+  TRUE

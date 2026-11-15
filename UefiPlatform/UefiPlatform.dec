@@ -1,41 +1,33 @@
-/*
- * UefiPlatform.dec — EDK II Device Declaration for the JASON (Xiaomi Note3) platform
- *
- * Declares:
- *   - gJasonPlatformTokenSpaceGuid : PCD GUID used in UefiPlatform.dsc
- *   - Any private protocols or data structures shared across drivers
- */
 [Defines]
   DEC_SPECIFICATION              = 0x0001001B
   PACKAGE_NAME                   = JASON
-  PACKAGE_GUID                   = EC87D9B2-A1F3-4d78-B2CF-12DE9FAE67CB
-  PACKAGE_VERSION                = 1.0.0
+  PACKAGE_GUID                   = EC87D9B2-A1F3-4D78-B2CF-12DE9FAE67CB
+  PACKAGE_VERSION                = 0.1.0
+
+[Guids]
+  gJasonPlatformTokenSpaceGuid = { 0x6F3D63A4, 0x5D3F, 0x4E38, { 0x8C, 0xC3, 0x0D, 0xB0, 0x9F, 0x1A, 0x67, 0xF2 } }
+
+[Protocols]
+  gJasonSpmIProtocolGuid = { 0x6A1B7C3D, 0x2F64, 0x4A19, { 0x9C, 0x58, 0x1D, 0xE3, 0x7B, 0x40, 0xC2, 0x55 } }
+  gJasonPmicKeyProtocolGuid = { 0x8C72D4B1, 0x5E36, 0x4F0A, { 0xB2, 0x19, 0x74, 0xC6, 0x0A, 0x3D, 0xE8, 0x91 } }
+  gJasonBatteryProtocolGuid = { 0xA7E3C058, 0x1D94, 0x4B62, { 0x8F, 0x21, 0x53, 0xBE, 0x6C, 0x08, 0xD7, 0x4A } }
 
 [PcdsFeatureFlag]
-  # Enable touch driver by default (jason always has it present)
-  gJasonPlatformTokenSpaceGuid.PcdTouchEnabled               | TRUE     | BOOLEAN | 0x10000020
-
-  # Default boot mode: 0 = normal, 1 = recovery, 2 = fastboot passthrough
-  gJasonPlatformTokenSpaceGuid.PcdDefaultBootMode            | 0x0    | UINT8  | 0x10000021
+  gJasonPlatformTokenSpaceGuid.PcdTouchEnabled       | TRUE     | BOOLEAN | 0x10000020
+  gJasonPlatformTokenSpaceGuid.PcdUfsEnabled         | TRUE     | BOOLEAN | 0x10000022
+  gJasonPlatformTokenSpaceGuid.PcdPmicEnabled        | TRUE     | BOOLEAN | 0x10000023
 
 [PcdsFixedAtBuild]
-  # Board hardware revision (minor / major packed into one 32-bit value)
-  # Layout: [15:0]=minor, [31:16]=major → 0x00020001 = rev 2.1
-  gJasonPlatformTokenSpaceGuid.PcdBoardRevId                 | 0x00020001 | UINT32 | 0x10000001
+  gJasonPlatformTokenSpaceGuid.PcdBoardRevId         | 0x00020001 | UINT32  | 0x10000001
+  gJasonPlatformTokenSpaceGuid.PcdNumCores           | 8          | UINT8   | 0x10000002
+  gJasonPlatformTokenSpaceGuid.PcdPanelWidth         | 1080       | UINT16  | 0x10000003
+  gJasonPlatformTokenSpaceGuid.PcdPanelHeight        | 2160       | UINT16  | 0x10000004
+  gJasonPlatformTokenSpaceGuid.PcdUfsPresent         | TRUE       | BOOLEAN | 0x10000005
+  gJasonPlatformTokenSpaceGuid.PcdDefaultBootMode    | 0          | UINT8   | 0x10000021
+  gJasonPlatformTokenSpaceGuid.PcdWifiChipset        | 0          | UINT8   | 0x10000007
+  gJasonPlatformTokenSpaceGuid.PcdUartBaudRate       | 115200     | UINT32  | 0x10000008
 
-  # Number of logical CPUs visible to bootloader (= physical cores on SDM660)
-  gJasonPlatformTokenSpaceGuid.PcdNumCores                   | 8        | UINT8  | 0x10000002
-
-  # Primary display width/height (pixels) — needed for early framebuffer setup
-  gJasonPlatformTokenSpaceGuid.PcdPanelWidth                 | 1080     | UINT16 | 0x10000003
-  gJasonPlatformTokenSpaceGuid.PcdPanelHeight                | 2160     | UINT16 | 0x10000004
-
-  # Whether UFS or eMMC is detected at boot time (false = fallback to MMC probe)
-  gJasonPlatformTokenSpaceGuid.PcdUfsPresent                 | TRUE     | BOOLEAN | 0x10000005
-
-[PcdsDynamicDefault]
-  # WLAN chipset enum — must match the firmware blob loaded onto the card
-  gJasonPlatformTokenSpaceGuid.PcdWifiChipset                | 0x0      | UINT8  | 0x10000007
-
-  # UART baud rate selected at runtime (typically 115200)
-  gJasonPlatformTokenSpaceGuid.PcdUartBaudRate               | 115200   | UINT32 | 0x10000008
+  # jason DTB /soc/interrupt-controller@17a00000 (arm,gic-v3).
+  gJasonPlatformTokenSpaceGuid.PcdGicDistributorBase   | 0x0000000017A00000 | UINT64 | 0x10000030
+  gJasonPlatformTokenSpaceGuid.PcdGicRedistributorBase | 0x0000000017B00000 | UINT64 | 0x10000031
+  gJasonPlatformTokenSpaceGuid.PcdGicRedistributorLength | 0x0000000000100000 | UINT64 | 0x10000032

@@ -1,0 +1,39 @@
+[Defines]
+  INF_VERSION                    = 0x0001001B
+  BASE_NAME                      = PmicKey
+  FILE_GUID                      = 4D18B6A0-71C5-4E2F-9A07-3F62B90C84D1
+  MODULE_TYPE                    = DXE_DRIVER
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = PmicKeyDriverEntry
+
+[Sources]
+  PmicKey.c
+  PmicKey.h
+
+[Packages]
+  MdePkg/MdePkg.dec
+  UefiPlatform/UefiPlatform.dec
+
+[Includes]
+  UefiPlatform/Include
+  Drivers/SpmI
+
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  DebugLib
+  PcdLib
+  PrintLib
+  TimerLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+
+[Protocols]
+  gJasonSpmIProtocolGuid
+  gJasonPmicKeyProtocolGuid
+
+[FeaturePcd]
+  gJasonPlatformTokenSpaceGuid.PcdPmicEnabled
+
+[Depex]
+  gJasonSpmIProtocolGuid

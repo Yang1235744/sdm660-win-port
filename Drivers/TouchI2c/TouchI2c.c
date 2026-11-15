@@ -1,158 +1,282 @@
 /*
- * TouchI2c.c — I2C SLIMBUS touch controller driver (Xiaomi Note 3)
+ * jason touch: TLMM + QUP I2C bring-up and Synaptics S3330 identification.
  *
- * The jason touch panel uses a TrueTouch Classic TSPP4xxx or equivalent
- * slave at I2C address 0x38, connected through QUP#2's I2C controller.
- * The controller is shared between the touchscreen (SLIMBUS) and the
- * ambient-light sensor (ALS). This driver only talks to the touch IC.
+ * Direct DTB evidence (synaptics_dsi_i2c@20 under i2c@c178000):
+ *   compatible = "synaptics,dsx-i2c-force"
+ *   reg        = 0x20
+ *   ub-i2c-addr= 0x2C
+ *   irq-gpio   = 67, reset-gpio = 66
  *
- * Register base: QUP_I2C1_BASE = 0x164C0000ULL
- * Reference:
- *   - linux/kernel/msm/drivers/i2c/i2c-qcom-cdc.c
- *   - SDM660 TRM §9 "Quartz Universal Peripheral (QUP) I2C"
+ * Status: bus and pin layer only. The driver pulses reset, performs one
+ * bounded identification read and logs the result. It deliberately does not
+ * publish EFI_ABSOLUTE_POINTER_PROTOCOL, because the S3330 report layout used
+ * by this panel variant is not documented in the DTB and a guessed layout
+ * would produce a non-functional pointer. Everything stays behind
+ * PcdTouchEnabled.
  */
 
 #include <Uefi.h>
+
+#include <Library/BaseMemoryLib.h>
+#include <Library/DebugLib.h>
 #include <Library/IoLib.h>
+#include <Library/PcdLib.h>
+#include <Library/PrintLib.h>
+#include <Library/TimerLib.h>
 #include <Library/UefiBootServicesTableLib.h>
-#include "../UefiPlatform/Include/Hardware/Platform.h"
 
-#define TOUCH_SLAVE_ADDR      0x38          /* 7-bit I2C address of touch IC    */
-#define TOUCH_REG_XY          0x04          /* register for first X/Y pair       */
-#define TOUCH_REG_STATUS      0x00          /* status register                   */
-#define TOUCH_REG_NUM_TOUCH   0x02          /* number of simultaneous touches    */
-#define I2C_TIMEOUT_US        5000           /* 5 ms per transaction              */
+#include <Hardware/Platform.h>
 
-/* ─── QUP v2 I2C register layout ────────────────────────────── */
-#define I2C_MSCMD         0x00            /* master sequence command            */
-#define I2C_MSTATUS       0x04            /* master sequence status             */
-#define I2C_MSCTRL        0x08            /* master sequence control            */
-#define I2C_RXFIFO        0x0C            /* receive data FIFO                  */
-#define I2C_TXFIFO        0x10            /* transmit data FIFO                 */
-#define I2C_CLK_RT        0x14            /* clock ratio (SCL = PCLK / ratio)   */
-#define I2C_MISTATUS      0x18            /* IRQ status                         */
-#define I2C_MIE_MASK      0x1C            /* IRQ enable mask                    */
+/* QUP I2C register offsets, mainline drivers/i2c/busses/i2c-qup.c. */
+#define QUP_CONFIG          0x000
+#define QUP_STATE           0x004
+#define QUP_IO_MODE         0x008
+#define QUP_SW_RESET        0x00C
+#define QUP_OPERATIONAL     0x018
+#define QUP_ERROR_FLAGS     0x01C
+#define QUP_ERROR_FLAGS_EN  0x020
+#define QUP_OPERATIONAL_MASK 0x028
+#define QUP_MX_OUTPUT_CNT   0x100
+#define QUP_OUT_FIFO_BASE   0x110
+#define QUP_MX_WRITE_CNT    0x150
+#define QUP_MX_INPUT_CNT    0x200
+#define QUP_MX_READ_CNT     0x208
+#define QUP_IN_FIFO_BASE    0x218
+#define QUP_I2C_CLK_CTL     0x400
+#define QUP_I2C_STATUS      0x404
 
-/* ─── Master sequence commands ───────────────────────────────── */
-#define I2C_CMD_START         0x01        /* generate START condition           */
-#define I2C_CMD_WRITE_ADDR    0x02        /* write device address + R/W bit     */
-#define I2C_CMD_READ_ADDR     0x03        /* read device address                */
-#define I2C_CMD_WRITE_DATA    0x04        /* write next byte from TX FIFO       */
-#define I2C_CMD_READ_DATA     0x05        /* read next byte into RX FIFO        */
-#define I2C_CMD_STOP          0x06        /* generate STOP condition            */
-#define I2C_CMD_RESTART       0x07        /* generate repeated START            */
+#define QUP_STATE_MASK      3
+#define QUP_STATE_VALID     BIT2
+#define QUP_RESET_STATE     0
+#define QUP_RUN_STATE       1
+#define QUP_PAUSE_STATE     3
 
-static volatile UINT32 * const I2C = (volatile UINT32 *)QUP_I2C1_BASE;
+#define QUP_OUTPUT_BLK_MODE (1 << 10)
+#define QUP_INPUT_BLK_MODE  (1 << 12)
+#define QUP_UNPACK_EN       BIT14
+#define QUP_PACK_EN         BIT15
 
-/* ─── Helper: wait until hardware is idle ──────────────────────── */
+#define QUP_OUT_SVC_FLAG    BIT8
+#define QUP_IN_SVC_FLAG     BIT9
+#define QUP_MX_OUTPUT_DONE  BIT10
+#define QUP_MX_INPUT_DONE   BIT11
+#define QUP_I2C_NACK_FLAG   BIT3
+
+#define QUP_TAG_V2_START        0x81
+#define QUP_TAG_V2_DATAWR       0x82
+#define QUP_TAG_V2_DATAWR_STOP  0x83
+#define QUP_TAG_V2_DATARD       0x85
+#define QUP_TAG_V2_DATARD_STOP  0x87
+
+#define TOUCH_I2C_TIMEOUT_US    10000U
+#define TOUCH_I2C_NACK_MSG_LEN  1800U
+
+STATIC
+VOID
+TouchLog (
+  IN CONST CHAR8  *Format,
+  ...
+  )
+{
+  CHAR8    Buffer[160];
+  VA_LIST  Marker;
+
+  VA_START (Marker, Format);
+  AsciiVSPrint (Buffer, sizeof (Buffer), Format, Marker);
+  VA_END (Marker);
+
+  DEBUG ((DEBUG_INFO, "Touch: %a\n", Buffer));
+}
+
+STATIC
+VOID
+TouchPinMux (
+  IN UINT32  Gpio,
+  IN UINT32  Config,
+  IN BOOLEAN Output
+  )
+{
+  UINT32  Value;
+
+  Value  = MmioRead32 (TLMM_GPIO_CFG (Gpio));
+  Value &= ~(TLMM_CFG_FUNC_MASK | 0x00000E00U | 0x000000C0U);
+  Value |= TLMM_CFG_FUNC_GPIO | (Config & 0x00000EC0U);
+  if (Output) {
+    Value |= TLMM_CFG_DRV_8MA;
+  }
+  MmioWrite32 (TLMM_GPIO_CFG (Gpio), Value);
+}
+
+/*
+ * QUP tag-mode block transfer. Tags are used so that a register address write
+ * can be followed by a repeated start, which is what the S3330 expects.
+ */
 STATIC
 EFI_STATUS
-WaitIdle (
-  VOID
+TouchI2cTransfer (
+  IN UINT8   SlaveAddr,
+  IN UINT8   *WriteTags,
+  IN UINTN   WriteWords,
+  OUT UINT8  *ReadTags,
+  OUT UINT8  *ReadData,
+  IN UINTN   ReadWords
   )
 {
-  for (UINTN t = 0; t < 20000; ++t) {
-    if ((READ_REGISTER_UINT32 (I2C + I2C_MSTATUS) & BIT (0)) != 0)
-      return EFI_SUCCESS;  /* MST_IDLE state reached */
-    MicroSecondDelay (1);
+  UINTN  Base;
+  UINTN  Index;
+  UINTN  Elapsed;
+  UINT32 Op;
+
+  Base = (UINTN)QUP_TOUCH_I2C_BASE;
+
+  /* Pause the block. */
+  MmioWrite32 (Base + QUP_STATE, QUP_PAUSE_STATE);
+  for (Elapsed = 0; Elapsed < TOUCH_I2C_TIMEOUT_US; Elapsed += 10) {
+    if ((MmioRead32 (Base + QUP_STATE) & QUP_STATE_VALID) != 0) {
+      break;
+    }
+    MicroSecondDelay (10);
   }
-  return EFI_TIMEOUT;
+
+  Op = MmioRead32 (Base + QUP_IO_MODE);
+  Op |= QUP_OUTPUT_BLK_MODE | QUP_UNPACK_EN | QUP_PACK_EN;
+  if (ReadWords != 0) {
+    Op |= QUP_INPUT_BLK_MODE;
+  }
+  MmioWrite32 (Base + QUP_IO_MODE, Op);
+
+  MmioWrite32 (Base + QUP_MX_OUTPUT_CNT, (UINT32)WriteWords);
+  MmioWrite32 (Base + QUP_MX_WRITE_CNT, (UINT32)WriteWords);
+  if (ReadWords != 0) {
+    MmioWrite32 (Base + QUP_MX_INPUT_CNT, (UINT32)ReadWords);
+    MmioWrite32 (Base + QUP_MX_READ_CNT, (UINT32)ReadWords);
+  }
+
+  for (Index = 0; Index < WriteWords; Index++) {
+    MmioWrite32 (Base + QUP_OUT_FIFO_BASE, WriteTags[Index]);
+  }
+
+  MmioWrite32 (Base + QUP_STATE, QUP_RUN_STATE);
+
+  for (Elapsed = 0; Elapsed < TOUCH_I2C_TIMEOUT_US; Elapsed += 10) {
+    UINT32  Status;
+
+    Status = MmioRead32 (Base + QUP_OPERATIONAL);
+    if ((Status & QUP_I2C_NACK_FLAG) != 0) {
+      TouchLog ("NACK from slave 0x%x\n", SlaveAddr);
+      return EFI_DEVICE_ERROR;
+    }
+    if (ReadWords == 0) {
+      if ((Status & QUP_MX_OUTPUT_DONE) != 0) {
+        break;
+      }
+    } else if ((Status & QUP_MX_INPUT_DONE) != 0) {
+      break;
+    }
+    MicroSecondDelay (10);
+  }
+
+  if (Elapsed >= TOUCH_I2C_TIMEOUT_US) {
+    TouchLog ("QUP timeout, operational 0x%x\n", MmioRead32 (Base + QUP_OPERATIONAL));
+    return EFI_TIMEOUT;
+  }
+
+  if (ReadWords != 0) {
+    for (Index = 0; Index < ReadWords; Index++) {
+      UINT32  Word;
+
+      Word = MmioRead32 (Base + QUP_IN_FIFO_BASE);
+      if (ReadData != NULL) {
+        ReadData[Index] = (UINT8)(Word & 0xFF);
+      }
+    }
+  }
+
+  MmioWrite32 (Base + QUP_STATE, QUP_PAUSE_STATE);
+  return EFI_SUCCESS;
 }
 
-/* ─── Public API ───────────────────────────────────────────────── */
+STATIC
+EFI_STATUS
+TouchReadRegister (
+  IN  UINT8  SlaveAddr,
+  IN  UINT8  Register,
+  OUT UINT8  *Data,
+  IN  UINTN  Length
+  )
+{
+  UINT8  Tags[8];
+  UINT8  ReadTags[8];
 
-/**
- * TouchReadRegs — send an I2C READ transaction to query the touch IC.
- *
- * Issues a START → WRITE(SLAVE_ADDR+R/W=0) → WRITE(REG_ADDR) → REPEAT_START
- * → READ(SLAVE_ADDR+R/W=1) → READ(N bytes) → STOP sequence.
- *
- * Buffer must hold at least Len bytes. Returns EFI_SUCCESS on completion.
- */
+  if (Length == 0 || Length > 8) {
+    return EFI_INVALID_PARAMETER;
+  }
+
+  ZeroMem (ReadTags, sizeof (ReadTags));
+  Tags[0] = QUP_TAG_V2_START;
+  Tags[1] = (UINT8)(SlaveAddr << 1);
+  Tags[2] = QUP_TAG_V2_DATAWR;
+  Tags[3] = Register;
+  if (Length == 1) {
+    Tags[4] = QUP_TAG_V2_DATARD_STOP;
+  } else {
+    Tags[4] = QUP_TAG_V2_DATARD;
+  }
+  Tags[5] = (UINT8)((SlaveAddr << 1) | 1);
+  if (Length > 1) {
+    Tags[6] = QUP_TAG_V2_DATARD_STOP;
+  }
+
+  return TouchI2cTransfer (SlaveAddr,
+                           Tags,
+                           (Length == 1) ? 5 : 7,
+                           ReadTags,
+                           Data,
+                           Length);
+}
+
 EFI_STATUS
 EFIAPI
-TouchReadRegs (
-  IN  UINT8   RegAddr,
-  OUT UINT8  *Buffer,
-  IN  UINTN   Len
+TouchDriverEntry (
+  IN EFI_HANDLE        ImageHandle,
+  IN EFI_SYSTEM_TABLE  *SystemTable
   )
 {
-  if (!Buffer || Len == 0)
-    return EFI_INVALID_PARAMETER;
+  EFI_STATUS  Status;
+  UINT8       Id[6];
 
-  /* Phase 1 — issue START */
-  WRITE_REGISTER_UINT32 (I2C + I2C_MSCMD, I2C_CMD_START);
-  EFI_STATUS s = WaitIdle(); if (EFI_ERROR(s)) return s;
-
-  /* Phase 2 — write device address (WR direction) */
-  WRITE_REGISTER_UINT32 (I2C + I2C_TXFIFO, (TOUCH_SLAVE_ADDR << 1) | 0x0);  /* R/W = 0 */
-  WRITE_REGISTER_UINT32 (I2C + I2C_MSCMD, I2C_CMD_WRITE_ADDR);
-  s = WaitIdle(); if (EFI_ERROR(s)) return s;
-
-  /* Phase 3 — write register address (internal pointer) */
-  WRITE_REGISTER_UINT32 (I2C + I2C_TXFIFO, RegAddr);
-  WRITE_REGISTER_UINT32 (I2C + I2C_MSCMD, I2C_CMD_WRITE_DATA);
-  s = WaitIdle(); if (EFI_ERROR(s)) return s;
-
-  /* Phase 4 — repeated START (read direction) */
-  WRITE_REGISTER_UINT32 (I2C + I2C_MSCMD, I2C_CMD_RESTART);
-  s = WaitIdle(); if (EFI_ERROR(s)) return s;
-
-  /* Phase 5 — read device address (RD direction) */
-  WRITE_REGISTER_UINT32 (I2C + I2C_TXFIFO, (TOUCH_SLAVE_ADDR << 1) | 0x1);
-  WRITE_REGISTER_UINT32 (I2C + I2C_MSCMD, I2C_CMD_READ_ADDR);
-  s = WaitIdle(); if (EFI_ERROR(s)) return s;
-
-  /* Phase 6 – read N bytes; last byte gets NACK, others ACKed by HW */
-  for (UINTN i = 0; i < Len; ++i) {
-    BOOLEAN Last = (i == Len - 1);
-    if (Last)
-      WRITE_REGISTER_UINT32 (I2C + I2C_MSCMD, I2C_CMD_READ_DATA);
-    else
-      WRITE_REGISTER_UINT32 (I2C + I2C_MSCMD, I2C_CMD_READ_DATA);  /* ACK implicit */
-    s = WaitIdle(); if (EFI_ERROR(s)) return s;
-
-    Buffer[i] = (UINT8)(READ_REGISTER_UINT32 (I2C + I2C_RXFIFO) & 0xFF);
+  if (!FeaturePcdGet (PcdTouchEnabled)) {
+    DEBUG ((DEBUG_INFO, "Touch: disabled by PCD\n"));
+    return EFI_UNSUPPORTED;
   }
 
-  /* Phase 7 — STOP */
-  WRITE_REGISTER_UINT32 (I2C + I2C_MSCMD, I2C_CMD_STOP);
-  return WaitIdle();
-}
+  /* Reset line: open drain output, then release the panel. */
+  TouchPinMux (TOUCH_RESET_GPIO, TLMM_CFG_PULL_UP, TRUE);
+  TouchPinMux (TOUCH_IRQ_GPIO, TLMM_CFG_PULL_UP, FALSE);
 
-/**
- * TouchGetPosition — query active touch points from the controller.
- *
- * Fills UpToPoints entries in OutPositions[]. Each entry has x/y in
- * raw 12-bit counts (typically 0..4095 for the jason panel).
- *
- * Returns the number of valid positions written, or 0 if no touch active.
- */
-UINTN
-EFIAPI
-TouchGetPosition (
-  OUT UINT16 *OutX,
-  OUT UINT16 *OutY,
-  IN  UINTN  MaxPoints
-  )
-{
-  UINT8 StatusBuf[4];
-  if (EFI_ERROR(TouchReadRegs (TOUCH_REG_STATUS, StatusBuf, sizeof(StatusBuf))))
-    return 0;
+  /* Drive reset low and back high using the CFG output register value. */
+  MmioWrite32 (TLMM_GPIO_CFG (TOUCH_RESET_GPIO),
+               MmioRead32 (TLMM_GPIO_CFG (TOUCH_RESET_GPIO)) & ~TLMM_CFG_PULL_UP);
+  MicroSecondDelay (TOUCH_RESET_ACTIVE_MS * 1000);
+  MmioWrite32 (TLMM_GPIO_CFG (TOUCH_RESET_GPIO),
+               MmioRead32 (TLMM_GPIO_CFG (TOUCH_RESET_GPIO)) | TLMM_CFG_PULL_UP);
+  MicroSecondDelay (TOUCH_RESET_DELAY_MS * 1000);
 
-  UINT8 NumTouches = (StatusBuf[1] >> 4) & 0x0F;   /* upper nibble of status byte */
-  if (NumTouches == 0 || NumTouches > MaxPoints)
-    NumTouches = MaxPoints;
-
-  /* Read XY registers starting at offset 4 */
-  for (UINTN i = 0; i < NumTouches; ++i) {
-    UINT8 PosBuf[8];
-    UINT8 regBase = TOUCH_REG_XY + i * 8;
-    if (EFI_ERROR(TouchReadRegs (regBase, PosBuf, sizeof(PosBuf))))
-      break;
-    if (OutX) OutX[i] = ((UINT16)PosBuf[0] << 4) | (PosBuf[1] >> 4);
-    if (OutY) OutY[i] = ((UINT16)(PosBuf[1] & 0x0F) << 8) | PosBuf[2];
+  ZeroMem (Id, sizeof (Id));
+  Status = TouchReadRegister (TOUCH_I2C_SLAVE_ADDR, 0x00, Id, sizeof (Id));
+  if (EFI_ERROR (Status)) {
+    TouchLog ("identification read failed: %r\n", Status);
+    return EFI_SUCCESS;
   }
 
-  return NumTouches;
+  TouchLog ("ID %02x %02x %02x %02x %02x %02x\n",
+            Id[0], Id[1], Id[2], Id[3], Id[4], Id[5]);
+
+  /*
+   * The report parser is intentionally absent: S3330 report offsets depend on
+   * the panel firmware build, and guessing them would create a broken pointer
+   * device. Capture one report with Android running before enabling input.
+   */
+  DEBUG ((DEBUG_WARN, "Touch: controller reachable, AbsolutePointer not published\n"));
+  return EFI_SUCCESS;
 }

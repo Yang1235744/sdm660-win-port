@@ -1,0 +1,39 @@
+[Defines]
+  INF_VERSION                    = 0x0001001B
+  BASE_NAME                      = PmicBattery
+  FILE_GUID                      = 91B60C4E-2A87-4D53-8C11-5E9A0F7D3628
+  MODULE_TYPE                    = DXE_DRIVER
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = PmicBatteryDriverEntry
+
+[Sources]
+  PmicBattery.c
+  PmicBattery.h
+
+[Packages]
+  MdePkg/MdePkg.dec
+  UefiPlatform/UefiPlatform.dec
+
+[Includes]
+  UefiPlatform/Include
+  Drivers/SpmI
+
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  DebugLib
+  PcdLib
+  PrintLib
+  TimerLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+
+[Protocols]
+  gJasonSpmIProtocolGuid
+  gJasonBatteryProtocolGuid
+
+[FeaturePcd]
+  gJasonPlatformTokenSpaceGuid.PcdPmicEnabled
+
+[Depex]
+  gJasonSpmIProtocolGuid

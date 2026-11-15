@@ -1,0 +1,36 @@
+[Defines]
+  INF_VERSION                    = 0x0001001B
+  BASE_NAME                      = JasonAcpiTables
+  FILE_GUID                      = 9D3D4DF8-18DF-4C9E-9A50-77DDB1D887C1
+  MODULE_TYPE                    = DXE_DRIVER
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = AcpiTablesEntryPoint
+
+[Sources]
+  AcpiTables.c
+  MadtGenerator.h
+  madt_gen.c
+  ssdt_cpu.asl
+  ssdt_periph.asl
+
+[Packages]
+  MdePkg/MdePkg.dec
+  UefiPlatform/UefiPlatform.dec
+
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  DebugLib
+  MemoryAllocationLib
+  PcdLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+  UefiLib
+
+[Protocols]
+  gEfiAcpiTableProtocolGuid       ## CONSUMES
+
+[Pcd]
+  gJasonPlatformTokenSpaceGuid.PcdGicDistributorBase
+  gJasonPlatformTokenSpaceGuid.PcdGicRedistributorBase
+  gJasonPlatformTokenSpaceGuid.PcdGicRedistributorLength

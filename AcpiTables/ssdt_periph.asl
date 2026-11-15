@@ -1,95 +1,90 @@
 /*
- * ssdt_periph.asl — Peripheral mapping SSDT for SDM660 (UART, SPI, GPIO, etc.)
+ * Peripheral SSDT for jason (SDM660, Mi Note 3) aimed at Windows 10 ARM64.
  *
- * Windows ARM64 uses the MADT / MCFG tables to discover serial ports, PCIe,
- * and other resources. This SSDT fills in the remaining gaps not covered by
- * the standard MADT:
+ * Resource values below come from the matching boot.img DTB and are recorded in
+ * Docs/hardware-notes.md. Two different kinds of device are published here:
  *
- *   - UART2 (BLSP1)          → COM port assignment
- *   - QUP SPI1 (WiFi interface)
- *   - QUP I2C1 (touch panel)
- *   - TLMM GPIO controller
- *   - Watchdog timer
+ *   1. Devices with an ACPI-defined identifier that Windows already knows:
+ *        XHC0  _HID = PNP0D10  (USB xHCI host controller)
+ *      Windows 10 ARM64 binds its inbox USB stack to this, so USB ports and
+ *      mass storage work without any vendor driver.
  *
- * Compile with:  iasl -tc ssdt_periph.asl → ssdt_periph.aml
+ *   2. Devices that have no public Windows driver yet:
+ *        WLAN  _HID = JAS0001  (ICNSS / WCN3990 WLAN)
+ *        UFS0  _HID = JAS0002  (UFS host controller)
+ *      These identifiers are Jason placeholders, not registered vendor IDs.
+ *      They make the hardware visible at a known ACPI path with the right
+ *      memory windows, which is what a vendor INF needs in order to bind.
+ *      Until such an INF is available the device shows up without a driver.
+ *      When a real Windows 10 ARM64 INF appears, replace the _HID string with
+ *      the one its INF matches; nothing else in this file has to change.
+ *
+ * Verified resources (DTB nodes under /soc):
+ *   ICNSS / WLAN   qcom,icnss@18800000   0x18800000 / 0x00800000, SPI 413..425
+ *   USB3 wrapper   ssusb@a800000         0x0A800000 / 0x00C8D0,  SPI 131
+ *   UFS host       ufshc@1da4000         0x01DA4000 / 0x00003000, SPI 265
+ *   UFS PHY        ufsphy@1da7000        0x01DA7000 / 0x00000DB8
+ *   UFS ICE        ufsice@1db0000        0x01DB0000 / 0x00008000
+ *
+ * MADT, MCFG and the other fixed tables are not authored here.
  */
 
-DefinitionBlock ("ssdt_periph.aml", "SSDT", 2, "JASON", "PERI", 0x00000001)
+DefinitionBlock ("ssdt_periph.aml", "SSDT", 2, "JASON", "PERI", 0x00000002)
 {
     Scope (\_SB)
     {
-        /* ── UART2: Bluetooth LE / console dual-use ─────────────── */
-        Device (UAR2)
+        /*
+         * USB xHCI. Only the xHCI register block is described (the DWC3 core
+         * starts at 0xC100), which is what the host controller driver needs.
+         *
+         * The interrupt is the GIC SPI 131 from the DTB, expressed as the ACPI
+         * GSI 163 (SPI + 32). Trigger mode is taken from the GIC SPI default;
+         * confirm level/active-high against /proc/interrupts on the device.
+         */
+        Device (XHC0)
         {
-            Name (_HID, "INT33C6")   /* Intel serial UART compatible ID */
-            Name (_CID, "PNP0500")   /* Standard 16550-compatible fallback */
-            Name (_UID, "BLSP1_UART2")
-            Name (_ADR, 0x13C00000)  /* Physical MMIO base */
-
+            Name (_HID, "PNP0D10")
+            Name (_UID, 0)
+            Name (_STA, 0x0F)
             Name (_CRS, ResourceTemplate ()
             {
-                Memory32Fixed (ReadOnly, 0x13C00000, 0x1000)
-                Interrupt (Level, ActiveHigh, Exclusive, Shared) { 0x3C }
-                    /* IRQ 60 = BLSP1_UART2_GSI; from dts pinctrl-0 mapping */
+                Memory32Fixed (ReadWrite, 0x0A800000, 0x0000C100)
+                Interrupt (ResourceConsumer, Level, ActiveHigh, Exclusive) { 163 }
             })
-
-            Method (_STA, 0, NotSerialized) { Return (0x0F) }
         }
 
-        /* ── Touch I2C (QUP #2) ─────────────────────────────────── */
-        Device (TI2C)
+        /*
+         * WLAN (ICNSS / WCN3990). No PCIe host exists on jason: the chip is
+         * attached through the ICNSS wrapper below, so a PCIe style binding
+         * cannot work here.
+         */
+        Device (WLAN)
         {
-            Name (_HID, "QCOM8021")   /* Qualcomm QUP I2C vendor ID */
-            Name (_UID, "QUP_I2C1")
-            Name (_ADR, 0x164C0000)
+            Name (_HID, "JAS0001")
+            Name (_UID, 0)
+            Name (_STA, 0x0F)
             Name (_CRS, ResourceTemplate ()
             {
-                Memory32Fixed (ReadWrite, 0x164C0000, 0x1000)
-                Interrupt (Level, ActiveHigh, Exclusive, Shared) { 0x6D }
+                Memory32Fixed (ReadWrite, 0x18800000, 0x00800000)
             })
-            Method (_STA, 0, NotSerialized) { Return (0x0F) }
         }
 
-        /* ── WiFi SPI (QUP #1) — used for Wi-Fi AT command interface */
-        Device (TSPI)
+        /*
+         * UFS host controller plus its PHY and crypto engine. Firmware side
+         * block I/O comes from Drivers/StorageUfs; this node exists so a
+         * Windows 10 ARM64 UFS driver can bind to a documented address range.
+         */
+        Device (UFS0)
         {
-            Name (_HID, "QCOM8020")   /* Qualcomm QUP SPI vendor ID */
-            Name (_UID, "QUP_SPI1")
-            Name (_ADR, 0x164B0000)
+            Name (_HID, "JAS0002")
+            Name (_UID, 0)
+            Name (_STA, 0x0F)
             Name (_CRS, ResourceTemplate ()
             {
-                Memory32Fixed (ReadWrite, 0x164B0000, 0x1000)
-                Interrupt (Level, ActiveHigh, Exclusive, Shared) { 0x6C }
+                Memory32Fixed (ReadWrite, 0x01DA4000, 0x00003000)
+                Memory32Fixed (ReadWrite, 0x01DA7000, 0x00000DB8)
+                Memory32Fixed (ReadWrite, 0x01DB0000, 0x00008000)
             })
-            Method (_STA, 0, NotSerialized) { Return (0x0F) }
-        }
-
-        /* ── GPIO controller (TLMM) ─────────────────────────────── */
-        Device (GPIO)
-        {
-            Name (_HID, "INT33FF")    /* Generic GPIO parent */
-            Name (_CID, "MSFT8001")   /* Microsoft GPIO compatible */
-            Name (_ADR, 0x10000000)
-            Name (_CRS, ResourceTemplate ()
-            {
-                Memory32Fixed (ReadWrite, 0x10000000, 0x100000)
-                Interrupt (Level, ActiveHigh, Exclusive, Shared) { 0x2D }
-            })
-            Method (_STA, 0, NotSerialized) { Return (0x0F) }
-        }
-
-        /* ── Watchdog Timer ─────────────────────────────────────── */
-        Device (WDG)
-        {
-            Name (_HID, "INT0C00")    /* WHEA watchdog device */
-            Name (_UID, "WDT")
-            Name (_ADR, 0x10500000)
-            Name (_CRS, ResourceTemplate ()
-            {
-                Memory32Fixed (ReadWrite, 0x10500000, 0x1000)
-                Interrupt (Level, ActiveHigh, Exclusive, Shared) { 0x3E }
-            })
-            Method (_STA, 0, NotSerialized) { Return (0x0F) }
         }
     }
 }

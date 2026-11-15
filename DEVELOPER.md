@@ -22,7 +22,7 @@ Drivers/                ARM64 driver skeletons
   ├── UsbHost/          DWC2 USB 2.0 OTG driver
   ├── TouchI2c/         QUP I2C1 → touch panel
   ├── PmicRegulator/    PMI632 PMIC LDO/Buck voltage & enable driver
-  └── WifiQca/          QCA6174 PCIe WiFi (stub — needs firmware upload path)
+  └── WifiQca/          Unsupported placeholder; jason uses WCN3990/ICNSS, not QCA6174 PCIe
 
 Docs/                   Design notes (write up your findings here)
   ├── arch.md           ← overall boot flow diagram

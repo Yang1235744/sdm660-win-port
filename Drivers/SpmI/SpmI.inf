@@ -1,0 +1,38 @@
+[Defines]
+  INF_VERSION                    = 0x0001001B
+  BASE_NAME                      = SpmI
+  FILE_GUID                      = 2E4F1A63-9B0C-4D85-8A31-6C0D5B7E94F2
+  MODULE_TYPE                    = DXE_DRIVER
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = SpmIDriverEntry
+
+[Sources]
+  SpmI.c
+  SpmI.h
+
+[Packages]
+  MdePkg/MdePkg.dec
+  UefiPlatform/UefiPlatform.dec
+
+[Includes]
+  UefiPlatform/Include
+
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  DebugLib
+  IoLib
+  PcdLib
+  PrintLib
+  TimerLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+
+[Protocols]
+  gJasonSpmIProtocolGuid
+
+[FeaturePcd]
+  gJasonPlatformTokenSpaceGuid.PcdPmicEnabled
+
+[Depex]
+  TRUE

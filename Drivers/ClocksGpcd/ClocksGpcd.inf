@@ -12,14 +12,14 @@
 [Packages]
   MdePkg/MdePkg.dec
   ArmPkg/ArmPkg.dec
-  JASON/UefiPlatform.dec
+  UefiPlatform/UefiPlatform.dec
+
+[Includes]
+  UefiPlatform/Include
 
 [LibraryClasses]
   BaseLib
+  CacheMaintenanceLib
   IoLib
-  UefiDriverEntryPoint
   UefiBootServicesTableLib
-
-[Protocols]
-  gEdkiiTokenSpaceGuid                           ## CONSUMED
-  gJasonPlatformTokenSpaceGuid                   ## CONSUMED
+  UefiDriverEntryPoint

@@ -21,9 +21,9 @@ PREFIX    ?= Build
 PYTHON    ?= python3
 IASL      ?= $(shell command -v iasl 2>/dev/null || echo "")
 
-ASL_SRC   := $(wildcard AcpiTables/*.asl)
+ASL_SRC   := AcpiTables/ssdt_cpu.asl AcpiTables/ssdt_periph.asl
 ASL_OBJS  := $(patsubst AcpiTables/%.asl,$(PREFIX)/acpi/%.aml,$(ASL_SRC))
-C_SRCS    := $(wildcard Drivers/**/*.c UefiPlatform/*.c)
+C_SRCS    := $(wildcard Drivers/*/*.c UefiPlatform/*.c AcpiTables/*.c)
 
 .PHONY: all acpi check layout clean
 
@@ -31,7 +31,7 @@ all: acpi check layout
 	@echo ""
 	@echo "=== Build complete ==="
 	@echo "ACPI blobs : $(PREFIX)/acpi/"
-	@echo "Firmware   : requires edk2-platforms; run 'make -f Makefile.edk2'"
+	@echo "Firmware   : run EDK2 build per Docs/build.md"
 
 acpi: $(ASL_OBJS)
 
@@ -41,7 +41,7 @@ $(PREFIX)/acpi/%.aml: AcpiTables/%.asl | $(PREFIX)/acpi
 		echo "       Install ACPICA tools: https://acpica.org/downloads"; \
 		exit 1; \
 	fi
-	$(IASL) -tc $<
+	$(IASL) -p $(PREFIX)/acpi/$* $<
 
 $(PREFIX)/acpi:
 	mkdir -p $(PREFIX)/acpi

@@ -1,7 +1,7 @@
 [Defines]
   INF_VERSION                    = 0x0001001B
   BASE_NAME                      = JasonPlatform
-  FILE_GUID                      = EC87D9B2-A1F3-4d78-B2CF-12DE9FAE67CB
+  FILE_GUID                      = EC87D9B2-A1F3-4D78-B2CF-12DE9FAE67CB
   MODULE_TYPE                    = UEFI_DRIVER
   VERSION_STRING                 = 1.0
   ENTRY_POINT                    = InitializePlatform
@@ -11,18 +11,7 @@
 
 [Packages]
   MdePkg/MdePkg.dec
-  MdeModulePkg/MdeModulePkg.dec
-  ArmPkg/ArmPkg.dec
-  ArmVirtPkg/ArmVirtPkg.dec
 
 [LibraryClasses]
-  BaseLib
-  DebugLib
-  IoLib
-  PrintLib
-  UefiBootServicesTableLib
-  UefiRuntimeServicesTableLib
-  CacheMaintenanceLib
-
-[Protocols]
-  gEfiAcpiTableProtocolGuid                    ## TO_BE_CONSUMED
+  UefiDriverEntryPoint
+  UefiLib

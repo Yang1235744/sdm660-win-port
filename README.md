@@ -1,135 +1,103 @@
-# Xiaomi Note3 (jason) — SDMLinux EFI Project for Windows ARM64 Boot
+# SDM660 Windows ARM64 Port（jason）
 
-> A community effort to port Windows ARM64 onto Qualcomm Snapdragon 660 devices
-> (Xiaomi Mi Note 3 / jason). This project provides a custom UEFI firmware image
-> and ACPI tables that allow `bootmgfw.efi` to boot on top of the Android/Linux
-> boot chain.
+面向 **Qualcomm Snapdragon 660 / Xiaomi Mi Note 3（jason）** 的开源研究工程，目标是逐步验证 Android 启动链、UEFI DXE 载荷、ACPI 硬件描述以及 Windows ARM64 启动所需驱动。
 
-## ⚠️ Disclaimer
+> **当前状态：研究骨架，不能刷机，也不能启动 Windows。** 仓库尚未包含完整的 SEC/PEI/DXE Core、经过验证的 boot.img 注入链或可用 Windows 驱动。错误的固件、分区或 MMIO 操作可能永久损坏设备。
 
-This is **experimental research-grade firmware**. It has NOT been tested on any
-real hardware yet. Building this requires reverse-engineered register maps from
-Qualcomm's SDM660 BSP. Proceed at your own risk — flashing invalid firmware can
-brick the device permanently.
+许可证：[Apache-2.0](LICENSE)。
 
-The project is released under **Apache-2.0** license. See [LICENSE](LICENSE).
+## 当前内容
 
----
+| 目录 | 内容 | 状态 |
+|---|---|---|
+| `UefiPlatform/` | DSC、DEC、FDF 与安全平台入口 | 可进入 EDK2 构建流程；硬件初始化默认禁用 |
+| `AcpiTables/` | ACPI 6.4 MADT 生成器、CPU SSDT、外设 SSDT 模板 | 按匹配 DTB 生成 GICv3 MADT；尚未真机启动验证 |
+| `Drivers/` | 时钟、UFS、USB、触摸、SPMI/PMIC、Wi-Fi 研究代码 | UFS 驱动已实现块设备；USB 走 xHCI 栈；SPMI 主控 + 按键 + 电量可读；触控仅总线和辨识；其余入口返回 `EFI_UNSUPPORTED` |
+| `Scripts/` | 纯 Python QCDT/DTB 提取及旧版注入研究脚本 | 不提供可刷写验证结果 |
+| `Docs/` | 构建、硬件采集、签名链和架构说明 | 持续补充真机证据 |
 
-## What We Build
+## 构建环境
 
-| Component | Purpose |
-|-----------|---------|
-| **UEFI DXE Core & Payload** | Drops into Android's boot flow via DTB overlay or kernel module, loads `bootmgfw.efi` from FAT partition |
-| **ACPI Tables (RSDP/SSDT)** | Describe SDM660's SoC peripherals to Windows ARM64 so it can find display, storage, USB, touch, WiFi, PMIC |
-| **ARM64 Driver Skeletons** | Reference implementations for GPCD/GPIO clocks, UFS/eMMC storage, USB 2.0 host controller, I2C touchpad, QCA Wi-Fi, and Power Management |
+推荐使用 **WSL2 Ubuntu 或原生 Linux**，并安装：
 
-## Hardware Target
+- Python 3、`git`、`make`、`build-essential`
+- `aarch64-linux-gnu-gcc` 交叉工具链
+- ACPICA `iasl`
+- EDK2 源码及其子模块（建议固定到经过验证的 stable tag）
 
-- **Device**: Xiaomi Mi Note 3 (codename: `jason`)
-- **SoC**: Qualcomm Snapdragon 660 (SDM660) — Kryo 260 (A73×4 + A53×4), Adreno 512
-- **Boot CPU**: Primary boot always runs on **CPU0 (A53)**, UEFI firmware must be **AArch64** (`arm64` ABI)
-- **Memory Map**: ~4 GB LPDDR4; UEFI region reserved at start of RAM (see `Platform.h` for carve-out addresses)
-
-## Prerequisites (Development Host — Windows)
+Ubuntu 依赖示例：
 
 ```bash
-# 1. Python 3.9+
-# 2. edk2-stable202411 or later (from https://github.com/tianocore/edk2)
+sudo apt update
+sudo apt install build-essential git python3 make acpica-tools gcc-aarch64-linux-gnu
+```
+
+## 构建
+
+将 `edk2` 与本仓库放在同一父目录：
+
+```bash
 git clone https://github.com/tianocore/edk2.git
-cd edk2 && git submodule update --init --recursive
+git clone https://github.com/Yang1235744/sdm660-win-port.git
 
-# 3. ARM64 toolchain (EDK2's default arm-toolchain works for build; real
-#    signing/validation still needs Qualcomms' proprietary tools)
-pip install pipwin
-pipwin install armcc  # optional, for some vendor modules
+cd edk2
+git submodule update --init --recursive
+make -C BaseTools
 
-# 4. acpica source (for iASL table compiler)
-wget https://sourceforge.net/projects/acpica/files/iasl/20240322/iasl-linux64.zip/download -O iasl.zip
-unzip iasl.zip && chmod +x iasl
+export WORKSPACE=$PWD
+export PACKAGES_PATH=$PWD:$PWD/../sdm660-win-port
+export GCC5_AARCH64_PREFIX=aarch64-linux-gnu-
+source edksetup.sh
+
+build -a AARCH64 -b RELEASE -t GCC5 -p UefiPlatform/UefiPlatform.dsc
 ```
 
-## Build
+产物位于 `$WORKSPACE/Build/JasonUefi/RELEASE_GCC5/`，FD/FV 文件在其中的 `FV/` 目录。`JASON_PAYLOAD.fd` 仅是本工程模块的固件卷容器，**不是完整可刷写固件**。
+
+单独编译 SSDT：
 
 ```bash
-# Clone this repo alongside EDK2
-git clone https://github.com/<your-user>/sdm660-win-port.git
-cd sdm660-win-port
-
-# Source EDK2 environment
-export WORKSPACE=$(pwd)/../edk2
-export EDK_TOOLS_PATH=$WORKSPACE/BaseTools
-export INF_EXTRA_INCLUDE_PATH=$WORKSPACE/MdeModulePkg
-export PACKAGES_PATH=$(pwd):$WORKSPACE
-
-# Build the firmware
-python edksetup.py build --platform JASON:XIAOMI_NOTE3:NULL
-  -a AARCH64
-  -b RELEASE
-  -t GCC5
-  -p UefiPlatform/UefiPlatform.dsc
+python3 AcpiTables/gcc_tables.py --output Build/acpi
 ```
 
-Build artifacts appear in `Build/JasonUefi/DEBUG_GCC5/FV/`. The combined FV blob
-is written into the `bootmgfw.efi` entry point inside the vendor recovery image.
+RSDP/XSDT 由 EDK2 ACPI 框架生成，不能将 `rsdp.asl` 当作普通 SSDT 安装。完整说明见 [构建文档](Docs/build.md)。
 
-## Repository Layout
+## 已从 boot.img 核实的 GICv3 配置
 
-```
-├── UefiPlatform/            ← Main UEFI/EDK2 platform
-│   ├── UefiPlatform.dsc     ← EDK II Device Specific Configuration
-│   ├── Platform.c           ← Boot entry, DTB injection, payload launcher
-│   └── Include/Hardware/    ← Register maps (reverse-engineered offsets)
-│
-├── AcpiTables/              ← RSDP + SSDT generation
-│   ├── rsdp.asl             ← Root System Description Pointer
-│   ├── ssdt_cpu.asl         ← CPU hot-plug descriptors (4 big + 4 little)
-│   ├── ssdt_periph.asl      ← UART, SPI, GPIO controller mapping
-│   └── gcc_tables.sh        ← Bash helper to compile ASL → ACPI binary blobs
-│
-├── Drivers/                 ← ARM64 driver reference skeletons
-│   ├── ClocksGpcd.c         ← SDM660 GPLL/VCO clock tree driver
-│   ├── StorageUfs.c         ← UFS HC (SDM660 eMMC/ufs bridge)
-│   ├── UsbHost.c            ← DWC2 USB 2.0 OTG controller driver
-│   ├── TouchI2c.c           ← I2C SLIMBUS touch panel driver
-│   ├── WifiQca.c            ← QCA6174/Ath10k PCIe WiFi driver stub
-│   └── PmicRegulator.c      ← PMI632 PMIC LDO/Buck control driver
-│
-├── Scripts/                 ← Host-side tooling
-│   └── InjectPayload.py     ← Android → UEFI chain switcher
-│
-└── Docs/                    ← Design documentation
-    ├── arch.md              ← Architecture overview
-    ├── hardware-notes.md    ← Known register layout (incomplete!)
-    └── roadmap.md           ← Milestone tracking
+上传镜像中唯一匹配 jason 根 `model` 的 DTB 明确描述 `arm,gic-v3`。`UefiPlatform.dsc` 现按该节点配置：
+
+```ini
+gJasonPlatformTokenSpaceGuid.PcdGicDistributorBase|0x0000000017A00000
+gJasonPlatformTokenSpaceGuid.PcdGicRedistributorBase|0x0000000017B00000
+gJasonPlatformTokenSpaceGuid.PcdGicRedistributorLength|0x0000000000100000
 ```
 
-## Roadmap / Current Status
+MADT 生成器使用 GICD、GICR 和 8 个 GICC 子表；GICv3 不再使用旧 GICv2 `PcdGicCpuInterfaceBase`。8 核 MPIDR 与 `/cpus` 一致。证据哈希、节点路径和未验证项见 [硬件说明](Docs/hardware-notes.md)。这些修改只修正静态 ACPI 描述，不代表 Windows 启动或真机 GIC 初始化已验证。
 
-| Phase | Milestone | Target Date |
-|-------|-----------|-------------|
-| Phase 1 | UEFI boot payload injects into Android initramfs, prints to UART | 2026-Q4 |
-| Phase 2 | ACPI tables recognized by ARM64 Linux as intermediate step | 2026-Q1 |
-| Phase 3 | Windows ARM64 bootmgfw.efi starts (display + basic cursor) | TBD |
-| Phase 4 | Full Windows stack with touch input, keyboard, display rotation | TBD |
+## 真机数据缺口
 
-### Hardware Knowledge Gaps (need reverse-engineering)
+1. **[OPEN]** PLATCTL 基址及解锁位偏移；不要与 GPLL 锁定位混用。
+2. **[DTB 已核实 / 运行待验证]** GICD/GICR、GICv3 和各核 MPIDR；仍需真机数据及 MADT 启动验证。
+3. **[DTB 已核实 / 驱动禁用]** UFS HC/PHY/ICE 寄存器窗口；时钟、复位、初始化顺序和实际容量仍待验证。
+4. **[结论修正]** Wi-Fi/Bluetooth 证据指向 WCN3990/ICNSS，未发现 PCIe host；不得假设 QCA6174 BDF/BAR。
+5. **[DTB 已核实 / 驱动禁用]** SPMI、PM660/PM660L、VADC/ADC-TM/RRADC 节点；采样与电源语义仍需对应驱动和真机日志。
+6. **[DTB 已核实 / 驱动禁用]** UART、QUP、TLMM、USB 和触摸资源；完整时钟、复位、PHY、供电及 pinctrl 流程仍未实现。
+7. **[OPEN]** UEFI 安全装载地址和完整保留内存图；FDF 的 `0xA0000000` 不能视为已验证。
 
-1. **[OPEN]** SDM660 PLATCTL base address — exact offset to read/write bootloader unlock bits
-2. **[OPEN]** Kernel DTB node names for `qcom,gpnvm`, `qcom,tcs-clk` — used by ClocksGpcd.c
-3. **[OPEN]** UFS device tree binding string: `qcom,ufs-hc-v2` is assumed but unverified
-4. **[OPEN]** QCA6174 PCIe function number on the SoC bus — needed for `WifiQca.c`
-5. **[KNOWN]** ADC_TM peripheral: `0x01800000` (base) — used by PMIC regulator sampling
+先按 [硬件说明](Docs/hardware-notes.md) 交叉采集数据，再考虑启用对应驱动。[ExtractBootDtb.py](Scripts/ExtractBootDtb.py) 只用 Python 标准库即可提取匹配 DTB；安装可选 `pyfdt` 后同时生成 DTS。
 
-## Contributing
+## 目录
 
-See [CONTRIBUTING.md](Docs/contributing.md) for development workflow notes.
-Pull requests welcome — please include a hardware validation log if you test on
-real jason silicon.
+```text
+UefiPlatform/             EDK2 平台 DSC/DEC/FDF 与入口
+AcpiTables/               MADT 生成器、SSDT 和 iASL 脚本
+Drivers/                   九个 ARM64 驱动研究模块
+Scripts/ExtractBootDtb.py boot.img → DTB → DTS 安全提取工具
+Docs/build.md             WSL/EDK2 构建说明
+Docs/hardware-notes.md    真机数据采集、AVB 与签名链状态
+CONTRIBUTING.md           贡献与验证要求
+```
 
-## Related Projects
+## 贡献
 
-- [linux-on-qcom-devices](https://github.com/semihalf/linux-on-qcom-devices) — postmarketOS jason support
-- [Windows-on-ARM-Patch](https://github.com/nickvoid/windows-arm-patch) — general Win11 ARM64 patching
-- [Redroid](https://github.com/remote-android/redroid) — Android container runtime (UI rendering)
-- [Phoenix OS](https://github.com/peter-tse/phoenixos) — x86 Android emulation (reference for UI design)
+请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。寄存器、IRQ、compatible、MPIDR 和分区布局的修改必须附带来源；真机测试需附采集日志。不要提交凭据、私有固件、完整受版权保护的 ROM 或未经说明的可刷写二进制。
