@@ -36,6 +36,7 @@ jobs:
             cp -r ../UefiPlatform ../Drivers ../AcpiTables .
             make -C BaseTools -j"$(nproc)"
             source edksetup.sh
+            sed -i 's/-fno-strict-aliasing/-fno-strict-aliasing -fno-stack-protector/g' Conf/tools_def.txt
             export GCC5_AARCH64_PREFIX=aarch64-linux-gnu-
             build -a AARCH64 -t GCC5 -b DEBUG -p UefiPlatform/UefiPlatform.dsc -n "$(nproc)"
           } 2>&1 | tee "$GITHUB_WORKSPACE/build-log.txt"
