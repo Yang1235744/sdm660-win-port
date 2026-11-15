@@ -2,6 +2,27 @@
 
 本仓库只记录可复核的改动。任何"已实现"都不等于"已在真机验证"；运行状态一列在 `Docs/hardware-notes.md`。
 
+## v0.4.2 — 整包 AARCH64 编译通过（CI 可复现）
+
+### 变更
+
+- `.github/workflows/build.yml`：Ubuntu 22.04 + `edk2-stable202405` + `gcc-aarch64-linux-gnu`，固定初始化 `brotli`、`berkeley-softfloat-3`、`mipisyst`、`libfdt` 四个 submodule；编译成功后上传 `Build/JasonUefi/DEBUG_GCC5/FV/*.fd`，失败时把日志推到 `ci-log` 分支。
+- 为让 EDK2 认得工程结构做的修正：
+  - include 路径从各 INF 的 `[Includes]` 移到 `UefiPlatform.dec`（`INF_VERSION 0x0001001B` 不允许 INF 内出现 `[Includes]`，否则 `error 3000`）。
+  - `UefiPlatform.dsc` 补齐库映射：`DevicePathLib`、`DxeServicesTableLib`、`DxeServicesLib`、`UefiFileHandleLib`、`UefiRuntimeLib`、`RegisterFilterLib`、`SynchronizationLib`、`PerformanceLib`、`ReportStatusCodeLib`、`ArmLib`、`ArmMmuLib`、`CompilerIntrinsicsLib`、`TimerLib`、`ArmGenericTimerCounterLib` 与 PCI 系列。
+  - `TimerLib` 用 `ArmArchTimerLib`；`ArmGenericTimerCounterLib` 用 `ArmGenericTimerPhyCounterLib`（后者的 `LIBRARY_CLASS` 不是 `TimerLib`，先前映射错会导致 `MicroSecondDelay` 未定义）。
+  - 关闭 `-fstack-protector`、关闭 LTO（CI 未编译 `liblto-aarch64`）。
+  - `FatPkg/EnhancedFatDxe/Fat.inf`：`edk2-stable202405` 的 FAT 模块名是 `Fat`，原 `EnhancedFat.inf` 不存在。
+- 源码修正：
+  - `StorageUfs.c`：`IndustryStandard/DevicePath.h` → `Protocol/DevicePath.h`，并补 `DevicePathLib`（`SetDevicePathNodeLength`）。
+  - `madt_gen.c`：`EFI_ACPI_DESCRIPTION_HEADER.OemTableId` 是 `UINT64`（不能 `CopyMem` 直接传整数），`CreatorVersion` 字段不存在，应为 `CreatorRevision`。
+  - `SpmI.c` / `PmicKey.c` / `PmicBattery.c`：删除手写的协议 GUID 对象。`[Protocols]` 中声明的 GUID 由 AutoGen 自动定义，重复定义会 `multiple definition of gJason...Guid` 链接失败。
+- `AcpiTables.inf` 补 `[Depex] gEfiAcpiTableProtocolGuid`（EDK2 要求每个模块显式声明 Depex）。
+
+### 状态
+
+- CI 结果：AARCH64 DEBUG 全量编译通过，产物 `FV/JASON_PAYLOAD.fd`（Actions 里以 `JasonUefi-FV` 附件下载）。真机行为未验证，UFS/触控/PMIC 驱动仍需在 note3 上实测。
+
 ## v0.4.1 — UFS 绑定标识核实
 
 ### 变更

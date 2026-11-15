@@ -44,6 +44,14 @@ jobs:
             build -a AARCH64 -t GCC5 -b DEBUG -p UefiPlatform/UefiPlatform.dsc -n "$(nproc)"
           } 2>&1 | tee "$GITHUB_WORKSPACE/build-log.txt"
 
+      - name: Upload firmware volume
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: JasonUefi-FV
+          path: e/Build/JasonUefi/DEBUG_GCC5/FV/*.fd
+          if-no-files-found: error
+
       - name: Publish build log on failure
         if: failure()
         run: |
