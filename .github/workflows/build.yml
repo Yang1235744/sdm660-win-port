@@ -24,15 +24,17 @@ jobs:
       - name: Build JasonUefi
         run: |
           set -o pipefail
+          set -x
           {
             git clone --depth 1 --branch edk2-stable202405 https://github.com/tianocore/edk2.git e
-            git clone --depth 1 https://github.com/tianocore/edk2-FatPkg.git FatPkg
+            git clone --depth 1 https://github.com/tianocore/edk2-FatPkg.git e/FatPkg
             cd e
             git submodule update --init --depth 1 \
               BaseTools/Source/C/BrotliCompress/brotli \
               MdeModulePkg/Library/BrotliCustomDecompressLib/brotli \
               ArmPkg/Library/ArmSoftFloatLib/berkeley-softfloat-3
-            cp -r ../UefiPlatform ../Drivers ../AcpiTables ../FatPkg .
+            cp -r ../UefiPlatform ../Drivers ../AcpiTables .
+            ls -l FatPkg/FatPkg.dec FatPkg/EnhancedFatDxe/EnhancedFat.inf
             make -C BaseTools -j"$(nproc)"
             source edksetup.sh
             export GCC5_AARCH64_PREFIX=aarch64-linux-gnu-
