@@ -34,3 +34,6 @@
   gJasonPlatformTokenSpaceGuid.PcdGicDistributorBase
   gJasonPlatformTokenSpaceGuid.PcdGicRedistributorBase
   gJasonPlatformTokenSpaceGuid.PcdGicRedistributorLength
+
+[Depex]
+  gEfiAcpiTableProtocolGuid
