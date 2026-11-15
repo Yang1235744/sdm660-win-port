@@ -28,10 +28,9 @@ jobs:
             git clone --depth 1 --branch edk2-stable202405 https://github.com/tianocore/edk2.git e
             cd e
             git submodule update --init --depth 1 \
-              BaseTools/Source/C/BrotliCompress \
-              BaseTools/Source/C/LzmaCompress \
-              BaseTools/Source/C/Zlib \
-              MdeModulePkg/Library/BrotliCustomDecompressLib/brotli
+              BaseTools/Source/C/BrotliCompress/brotli \
+              MdeModulePkg/Library/BrotliCustomDecompressLib/brotli \
+              ArmPkg/Library/ArmSoftFloatLib/berkeley-softfloat-3
             cp -r ../UefiPlatform ../Drivers ../AcpiTables .
             make -C BaseTools -j"$(nproc)"
             source edksetup.sh
