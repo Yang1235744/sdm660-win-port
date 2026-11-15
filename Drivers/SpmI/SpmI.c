@@ -33,10 +33,6 @@
 #define SPMI_TIMEOUT_US   1000U
 #define SPMI_MAX_TRANSFER 8U
 
-EFI_GUID  gJasonSpmIProtocolGuid = {
-  0x6A1B7C3D, 0x2F64, 0x4A19, { 0x9C, 0x58, 0x1D, 0xE3, 0x7B, 0x40, 0xC2, 0x55 }
-};
-
 /**
   Print a formatted line without relying on DebugLib varargs.
 **/

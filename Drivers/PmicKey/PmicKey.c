@@ -29,10 +29,6 @@
 #include "../SpmI/SpmI.h"
 #include "PmicKey.h"
 
-EFI_GUID  gJasonPmicKeyProtocolGuid = {
-  0x8C72D4B1, 0x5E36, 0x4F0A, { 0xB2, 0x19, 0x74, 0xC6, 0x0A, 0x3D, 0xE8, 0x91 }
-};
-
 STATIC
 VOID
 PmicKeyLog (
