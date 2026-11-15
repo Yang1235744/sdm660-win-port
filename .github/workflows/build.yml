@@ -30,7 +30,9 @@ jobs:
             git submodule update --init --depth 1 \
               BaseTools/Source/C/BrotliCompress/brotli \
               MdeModulePkg/Library/BrotliCustomDecompressLib/brotli \
-              ArmPkg/Library/ArmSoftFloatLib/berkeley-softfloat-3
+              ArmPkg/Library/ArmSoftFloatLib/berkeley-softfloat-3 \
+              MdePkg/Library/MipiSysTLib/mipisyst \
+              MdePkg/Library/BaseFdtLib/libfdt
             cp -r ../UefiPlatform ../Drivers ../AcpiTables .
             make -C BaseTools -j"$(nproc)"
             source edksetup.sh
