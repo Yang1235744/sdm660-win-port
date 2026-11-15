@@ -18,7 +18,6 @@
 
 #include <Uefi.h>
 
-#include <IndustryStandard/DevicePath.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/CacheMaintenanceLib.h>
 #include <Library/DebugLib.h>
