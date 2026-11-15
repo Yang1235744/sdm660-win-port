@@ -25,7 +25,7 @@
 #include <Library/UefiBootServicesTableLib.h>
 
 #include <Hardware/Platform.h>
-#include "SpmI.h"
+#include "../SpmI/SpmI.h"
 #include "PmicBattery.h"
 
 #define FG_SOC_RETRIES  10U

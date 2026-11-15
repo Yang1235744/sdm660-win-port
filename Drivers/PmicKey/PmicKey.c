@@ -26,7 +26,7 @@
 #include <Library/UefiBootServicesTableLib.h>
 
 #include <Hardware/Platform.h>
-#include "SpmI.h"
+#include "../SpmI/SpmI.h"
 #include "PmicKey.h"
 
 EFI_GUID  gJasonPmicKeyProtocolGuid = {

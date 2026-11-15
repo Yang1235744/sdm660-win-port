@@ -14,9 +14,6 @@
   MdePkg/MdePkg.dec
   UefiPlatform/UefiPlatform.dec
 
-[Includes]
-  UefiPlatform/Include
-
 [LibraryClasses]
   BaseLib
   BaseMemoryLib
