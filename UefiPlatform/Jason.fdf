@@ -1,0 +1,71 @@
+# Research payload container only. This is not a complete bootable ROM image.
+# Verify the load address and RAM reservations before loading it on jason.
+
+[FD.JASON_PAYLOAD]
+BaseAddress = 0xA0000000
+Size = 0x00400000
+ErasePolarity = 1
+BlockSize = 0x1000
+NumBlocks = 0x400
+
+0x00000000|0x00400000
+FV = JASON_MAIN_FV
+
+[FV.JASON_MAIN_FV]
+FvForceRebase = FALSE
+BlockSize = 0x1000
+NumBlocks = 0x400
+FvAlignment = 16
+ERASE_POLARITY = 1
+MEMORY_MAPPED = TRUE
+STICKY_WRITE = FALSE
+LOCK_CAP = FALSE
+LOCK_STATUS = FALSE
+WRITE_DISABLED_CAP = FALSE
+WRITE_ENABLED_CAP = TRUE
+WRITE_STATUS = FALSE
+WRITE_LOCK_CAP = FALSE
+WRITE_LOCK_STATUS = FALSE
+READ_DISABLED_CAP = FALSE
+READ_ENABLED_CAP = TRUE
+READ_STATUS = FALSE
+READ_LOCK_CAP = FALSE
+READ_LOCK_STATUS = FALSE
+FvNameGuid = 48B2E6E2-4DB5-4D7B-8FC0-0D64C7EBBA01
+
+INF UefiPlatform/Platform.inf
+INF AcpiTables/AcpiTables.inf
+INF Drivers/ClocksGpcd/ClocksGpcd.inf
+INF Drivers/StorageUfs/StorageUfs.inf
+INF Drivers/UsbHost/UsbHost.inf
+INF Drivers/TouchI2c/TouchI2c.inf
+INF Drivers/PmicRegulator/PmicRegulator.inf
+INF Drivers/WifiQca/WifiQca.inf
+INF Drivers/SpmI/SpmI.inf
+INF Drivers/PmicKey/PmicKey.inf
+INF Drivers/PmicBattery/PmicBattery.inf
+
+# USB host + block device stack
+INF MdeModulePkg/Bus/Pci/NonDiscoverablePciDeviceDxe/NonDiscoverablePciDeviceDxe.inf
+INF MdeModulePkg/Bus/Pci/PciBusDxe/PciBusDxe.inf
+INF MdeModulePkg/Bus/Pci/XhciDxe/XhciDxe.inf
+INF MdeModulePkg/Bus/Usb/UsbBusDxe/UsbBusDxe.inf
+INF MdeModulePkg/Bus/Usb/UsbMassStorageDxe/UsbMassStorageDxe.inf
+INF MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
+INF MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
+INF FatPkg/EnhancedFatDxe/EnhancedFat.inf
+
+[Rule.Common.UEFI_DRIVER]
+  FILE DRIVER = $(NAMED_GUID) {
+    PE32     PE32                 $(INF_OUTPUT)/$(MODULE_NAME).efi
+    UI       STRING="$(MODULE_NAME)" Optional
+    VERSION  STRING="$(INF_VERSION)" Optional BUILD_NUM=$(BUILD_NUMBER)
+  }
+
+[Rule.Common.DXE_DRIVER]
+  FILE DRIVER = $(NAMED_GUID) {
+    PE32     PE32                 $(INF_OUTPUT)/$(MODULE_NAME).efi
+    UI       STRING="$(MODULE_NAME)" Optional
+    VERSION  STRING="$(INF_VERSION)" Optional BUILD_NUM=$(BUILD_NUMBER)
+    RAW      ASL Optional         |.aml
+  }

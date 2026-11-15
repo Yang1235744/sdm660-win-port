@@ -11,6 +11,7 @@ Build/
 *.dep
 *.htm
 *.fdf
+!UefiPlatform/*.fdf
 *.map
 *.txt
 
