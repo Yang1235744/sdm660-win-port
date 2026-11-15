@@ -19,6 +19,7 @@
   BaseMemoryLib
   CacheMaintenanceLib
   DebugLib
+  DevicePathLib
   IoLib
   MemoryAllocationLib
   PcdLib
