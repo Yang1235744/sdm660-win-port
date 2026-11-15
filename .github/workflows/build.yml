@@ -1,0 +1,52 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'build-log.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  aarch64:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu uuid-dev nasm iasl python3
+
+      - name: Fetch edk2
+        run: |
+          git clone --depth 1 --branch edk2-stable202405 https://github.com/tianocore/edk2.git e
+          cd e
+          git submodule update --init --depth 1 \
+            BaseTools/Source/C/BrotliCompress \
+            BaseTools/Source/C/LzmaCompress \
+            BaseTools/Source/C/Zlib \
+            MdeModulePkg/Library/BrotliCustomDecompressLib/brotli
+
+      - name: Build JasonUefi
+        run: |
+          cp -r UefiPlatform Drivers AcpiTables e/
+          cd e
+          make -C BaseTools -j"$(nproc)"
+          source edksetup.sh
+          export GCC5_AARCH64_PREFIX=aarch64-linux-gnu-
+          build -a AARCH64 -t GCC5 -b DEBUG -p UefiPlatform/UefiPlatform.dsc -n "$(nproc)" 2>&1 | tee "$GITHUB_WORKSPACE/build-log.txt"
+
+      - name: Publish build log on failure
+        if: failure()
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          git config user.name "ci"
+          git config user.email "ci@localhost"
+          git checkout -B ci-log
+          git add -f build-log.txt
+          git commit -m "ci: build log [skip ci]" || true
+          git push -f origin ci-log
